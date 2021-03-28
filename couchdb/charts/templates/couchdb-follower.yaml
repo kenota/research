@@ -1,0 +1,141 @@
+{{ range $i, $e := until 9 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-db-follower-{{ $i }}
+  labels:
+    app.kubernetes.io/name: research-couchdb
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubrenetes.io/component: db-follower
+    app.kubrenetes.io/follower-id: "{{ $i }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: research-couchdb
+      app.kubernetes.io/managed-by: {{ $.Release.Service }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubrenetes.io/component: db-follower
+      app.kubrenetes.io/follower-id: "{{ $i }}"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: research-couchdb
+        app.kubernetes.io/managed-by: {{ $.Release.Service }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubrenetes.io/component: db-follower
+        app.kubrenetes.io/follower-id: "{{ $i }}"
+    spec:
+      securityContext:
+        runAsUser: 5984
+        runAsGroup: 5984
+      containers:
+      - name: couchdb
+        image: couchdb:3.1.1        
+        ports:
+        - containerPort: 5984
+        resources:
+          limits:
+              cpu: 2
+          requests:
+              cpu: 0.5
+        volumeMounts:
+        - name: config          
+          mountPath: "/opt/couchdb/etc/local.ini" 
+          subPath: follower.ini
+      volumes:
+      - name: config
+        configMap:
+          name: {{ $.Release.Name }}-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-db-follower-{{$i}}
+  labels:
+        app.kubernetes.io/managed-by: {{ $.Release.Service }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubernetes.io/component: db-follower
+        app.kubrenetes.io/follower-id: "{{ $i }}"
+        app.kubernetes.io/name: research-couchdb
+spec:
+  ports:
+    - port: 5984
+  selector:    
+    app.kubernetes.io/name: research-couchdb
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubrenetes.io/component: db-follower
+    app.kubrenetes.io/follower-id: "{{ $i }}"  
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Release.Name}}-follower-{{ $i }}
+  labels:
+    app.kubernetes.io/name: couchdb-follower
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubrenetes.io/component: db-follower
+    app.kubrenetes.io/follower-id: "{{ $i }}"
+  annotations:    
+    kubernetes.io/ingress.class: "nginx"    
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+spec:
+  rules:
+    - host: couchdb-follower-{{$i}}.k8slocal
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ $.Release.Name }}-db-follower-{{$i}}
+              port:
+                number: 5984
+---
+{{end}}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-db-follower-cluster
+  labels:
+        app.kubernetes.io/managed-by: {{ $.Release.Service }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubernetes.io/component: db-follower        
+        app.kubernetes.io/name: research-couchdb
+spec:
+  ports:
+    - port: 5984
+  selector:    
+    app.kubernetes.io/name: research-couchdb
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubrenetes.io/component: db-follower      
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Release.Name}}-follower-cluster
+  labels:
+    app.kubernetes.io/name: couchdb-follower
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubrenetes.io/component: db-follower    
+  annotations:    
+    kubernetes.io/ingress.class: "nginx"    
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+spec:
+  rules:
+    - host: couchdb-follower-cluster.k8slocal
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ $.Release.Name }}-db-follower-cluster
+              port:
+                number: 5984

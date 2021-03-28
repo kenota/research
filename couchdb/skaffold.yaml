@@ -1,0 +1,9 @@
+apiVersion: skaffold/v2beta11
+kind: Config
+build:  
+deploy:
+  helm:
+    releases:
+      - name: research-couchdb      
+        chartPath: charts        
+        namespace: research
