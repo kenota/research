@@ -1,0 +1,3 @@
+{
+    aString = "something";
+}
